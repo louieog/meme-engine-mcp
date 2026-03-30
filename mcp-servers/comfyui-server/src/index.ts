@@ -82,15 +82,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   
-  console.error("=" * 60);
+  console.error("=".repeat(60));
   console.error("ComfyUI Cloud MCP Server v1.0.0");
-  console.error("=" * 60);
+  console.error("=".repeat(60));
   console.error(`API Key: ${apiKey ? "***" + apiKey.slice(-4) : "NOT SET"}`);
   console.error("Available tools:");
   for (const tool of TOOLS) {
     console.error(`  - ${tool.name}: ${tool.description.slice(0, 60)}...`);
   }
-  console.error("=" * 60);
+  console.error("=".repeat(60));
   console.error("Server ready. Waiting for requests...");
   
   await server.connect(transport);

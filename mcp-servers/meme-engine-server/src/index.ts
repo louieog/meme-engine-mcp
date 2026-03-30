@@ -49,35 +49,38 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     let result: any;
+    
+    // Ensure args is defined and cast to the appropriate type
+    const toolArgs = (args || {}) as any;
 
     // Route to appropriate orchestrator method
     switch (name) {
       case "research_trends":
-        result = await orchestrator.researchTrends(args);
+        result = await orchestrator.researchTrends(toolArgs);
         break;
       case "create_production_brief":
-        result = await orchestrator.createProductionBrief(args);
+        result = await orchestrator.createProductionBrief(toolArgs);
         break;
       case "generate_meme_video":
-        result = await orchestrator.generateMemeVideo(args);
+        result = await orchestrator.generateMemeVideo(toolArgs);
         break;
       case "generate_scene_assets":
-        result = await orchestrator.generateSceneAssets(args);
+        result = await orchestrator.generateSceneAssets(toolArgs);
         break;
       case "add_text_hooks":
-        result = await orchestrator.addTextHooks(args);
+        result = await orchestrator.addTextHooks(toolArgs);
         break;
       case "get_pipeline_status":
-        result = await orchestrator.getPipelineStatus(args);
+        result = await orchestrator.getPipelineStatus(toolArgs);
         break;
       case "list_available_models":
-        result = await orchestrator.listAvailableModels(args);
+        result = await orchestrator.listAvailableModels(toolArgs);
         break;
       case "validate_brief":
-        result = await orchestrator.validateBrief(args);
+        result = await orchestrator.validateBrief(toolArgs);
         break;
       case "estimate_cost":
-        result = await orchestrator.estimateCost(args);
+        result = await orchestrator.estimateCost(toolArgs);
         break;
       default:
         throw new Error(`Unknown tool: ${name}`);
