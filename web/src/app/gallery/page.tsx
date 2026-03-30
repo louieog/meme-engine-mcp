@@ -1,0 +1,131 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+interface VideoOutput {
+  id: string;
+  concept: string;
+  format: string;
+  created_at: string;
+  thumbnail?: string;
+  files: {
+    "9x16"?: string;
+    "16x9"?: string;
+  };
+}
+
+export default function GalleryPage() {
+  const [videos, setVideos] = useState<VideoOutput[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchVideos();
+  }, []);
+
+  const fetchVideos = async () => {
+    try {
+      const response = await fetch("/api/outputs");
+      const data = await response.json();
+      setVideos(data.videos || []);
+    } catch (error) {
+      console.error("Failed to fetch videos:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-2xl">Loading...</div>
+      </div>
+    );
+  }
+
+  if (videos.length === 0) {
+    return (
+      <div className="text-center py-20">
+        <div className="text-6xl mb-4">🎬</div>
+        <h1 className="text-3xl font-bold mb-4">No Videos Yet</h1>
+        <p className="text-gray-400 mb-8">
+          Create your first meme video to see it here
+        </p>
+        <a
+          href="/create"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 rounded-full font-semibold hover:bg-purple-700 transition-colors"
+        >
+          Create Video
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h1 className="text-3xl font-bold mb-8">Your Videos</h1>
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {videos.map((video) => (
+          <VideoCard key={video.id} video={video} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function VideoCard({ video }: { video: VideoOutput }) {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <div
+      className="glass rounded-2xl overflow-hidden transition-transform hover:scale-[1.02]"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Thumbnail */}
+      <div className="aspect-video bg-gray-800 relative overflow-hidden">
+        {video.thumbnail ? (
+          <img
+            src={video.thumbnail}
+            alt={video.concept}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full text-4xl">
+            🎬
+          </div>
+        )}
+        {isHovered && (
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-4">
+            {video.files["9x16"] && (
+              <a
+                href={video.files["9x16"]}
+                download
+                className="px-4 py-2 bg-purple-600 rounded-lg font-medium hover:bg-purple-700 transition-colors"
+              >
+                9:16
+              </a>
+            )}
+            {video.files["16x9"] && (
+              <a
+                href={video.files["16x9"]}
+                download
+                className="px-4 py-2 bg-purple-600 rounded-lg font-medium hover:bg-purple-700 transition-colors"
+              >
+                16:9
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="p-4">
+        <h3 className="font-semibold mb-1 line-clamp-2">{video.concept}</h3>
+        <div className="flex items-center justify-between text-sm text-gray-400">
+          <span className="capitalize">{video.format}</span>
+          <span>{new Date(video.created_at).toLocaleDateString()}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
