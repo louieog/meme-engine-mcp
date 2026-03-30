@@ -1,0 +1,21 @@
+{
+  "name": "@meme-engine/meme-engine-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for Meme Engine video generation orchestration",
+  "type": "module",
+  "bin": { "meme-engine-server": "./dist/index.js" },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": { "node": ">=18.0.0" }
+}

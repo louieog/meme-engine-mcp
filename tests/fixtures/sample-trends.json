@@ -1,0 +1,77 @@
+[
+  {
+    "topic": "AI fails",
+    "virality_score": 0.92,
+    "sentiment": "humorous",
+    "volume": 154320,
+    "growth_rate": 0.15,
+    "peak_time": "2024-01-15T08:00:00Z",
+    "demographic": ["18-34"],
+    "platforms": ["TikTok", "Instagram", "YouTube Shorts"],
+    "related_hashtags": ["#AIfails", "#ChatGPT", "#techfail"],
+    "context": {
+      "origin": "Users sharing AI-generated content mistakes",
+      "current_trend": "ChatGPT providing absurd answers"
+    }
+  },
+  {
+    "topic": "Relatable work moments",
+    "virality_score": 0.88,
+    "sentiment": "relatable",
+    "volume": 234567,
+    "growth_rate": 0.08,
+    "peak_time": "2024-01-14T09:00:00Z",
+    "demographic": ["22-40"],
+    "platforms": ["TikTok", "Instagram"],
+    "related_hashtags": ["#corporatelife", "#worklife", "#officememes"],
+    "context": {
+      "origin": "Office workers sharing daily struggles",
+      "current_trend": "Monday motivation fails"
+    }
+  },
+  {
+    "topic": "Pet fails",
+    "virality_score": 0.85,
+    "sentiment": "adorable",
+    "volume": 345678,
+    "growth_rate": 0.05,
+    "peak_time": "2024-01-13T10:00:00Z",
+    "demographic": ["13-45"],
+    "platforms": ["TikTok", "Instagram", "YouTube Shorts"],
+    "related_hashtags": ["#catsoftiktok", "#petsoftiktok", "#funnyanimals"],
+    "context": {
+      "origin": "Pet owners sharing funny pet moments",
+      "current_trend": "Cats knocking things over"
+    }
+  },
+  {
+    "topic": "Unexpected plot twists",
+    "virality_score": 0.90,
+    "sentiment": "surprising",
+    "volume": 198765,
+    "growth_rate": 0.12,
+    "peak_time": "2024-01-14T15:00:00Z",
+    "demographic": ["16-30"],
+    "platforms": ["TikTok", "YouTube Shorts"],
+    "related_hashtags": ["#plotwist", "#unexpected", "#viral"],
+    "context": {
+      "origin": "Short-form storytelling",
+      "current_trend": "3-panel story format"
+    }
+  },
+  {
+    "topic": "Nostalgia content",
+    "virality_score": 0.78,
+    "sentiment": "nostalgic",
+    "volume": 123456,
+    "growth_rate": 0.03,
+    "peak_time": "2024-01-12T20:00:00Z",
+    "demographic": ["25-35"],
+    "platforms": ["Instagram", "TikTok"],
+    "related_hashtags": ["#90skid", "#nostalgia", "#childhoodmemories"],
+    "context": {
+      "origin": "Millennial nostalgia for 90s/2000s",
+      "current_trend": "Old tech and toys"
+    }
+  }
+]

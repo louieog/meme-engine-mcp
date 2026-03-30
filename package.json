@@ -1,0 +1,38 @@
+{
+  "name": "meme-engine-mcp",
+  "version": "1.0.0",
+  "description": "Viral meme video generation engine using Anthropic's Model Context Protocol (MCP) and ComfyUI Cloud",
+  "private": true,
+  "workspaces": [
+    "mcp-servers/*",
+    "web",
+    "tests/typescript"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "build:mcp-servers": "npm run build --workspace=mcp-servers/comfyui-server --workspace=mcp-servers/assembly-server --workspace=mcp-servers/meme-engine-server",
+    "test": "npm run test --workspaces",
+    "test:python": "pytest tests/python/",
+    "test:ts": "npm run test --workspace=tests/typescript",
+    "test:integration": "pytest tests/integration/ -m integration",
+    "dev:web": "npm run dev --workspace=web",
+    "install:all": "npm install && pip install -r requirements.txt",
+    "setup": "npm run install:all && npm run build:mcp-servers",
+    "generate": "python -m src.python.pipeline",
+    "lint": "npm run lint --workspaces && flake8 src/python/",
+    "format": "black src/python/ && npm run format --workspaces"
+  },
+  "keywords": [
+    "meme",
+    "video-generation",
+    "ai",
+    "mcp",
+    "comfyui",
+    "viral-content"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}

@@ -1,0 +1,145 @@
+{
+  "last_node_id": 10,
+  "last_link_id": 5,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "GeminiImage2Node",
+      "pos": [100, 100],
+      "size": [320, 180],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [1],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GeminiImage2Node"
+      },
+      "widgets_values": [
+        "A scenic mountain view at sunset with dramatic clouds",
+        "gemini-3-pro-image-preview",
+        "9:16",
+        "photorealistic, high quality, detailed",
+        "blur, low quality, distorted",
+        42,
+        1
+      ]
+    },
+    {
+      "id": 2,
+      "type": "SaveImage",
+      "pos": [500, 100],
+      "size": [320, 100],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 1
+        }
+      ],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": ["scene_1"]
+    },
+    {
+      "id": 3,
+      "type": "LoadImage",
+      "pos": [100, 350],
+      "size": [320, 280],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [2],
+          "slot_index": 0
+        }
+      ],
+      "properties": {},
+      "widgets_values": ["scene_1_00001_.png", "image"]
+    },
+    {
+      "id": 4,
+      "type": "KlingOmniProImageToVideoNode",
+      "pos": [500, 350],
+      "size": [320, 300],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [3],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KlingOmniProImageToVideoNode"
+      },
+      "widgets_values": [
+        "Camera pan across the mountains, clouds moving slowly, golden hour lighting",
+        "kling-v3-omni",
+        5,
+        "high",
+        0.8,
+        0.9,
+        true,
+        42
+      ]
+    },
+    {
+      "id": 5,
+      "type": "SaveVideo",
+      "pos": [900, 350],
+      "size": [320, 100],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "link": 3
+        }
+      ],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": ["scene_1_video"]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 2, 0, "IMAGE"],
+    [2, 3, 0, 4, 0, "IMAGE"],
+    [3, 4, 0, 5, 0, "VIDEO"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1,
+      "offset": [0, 0]
+    }
+  },
+  "version": 0.4
+}

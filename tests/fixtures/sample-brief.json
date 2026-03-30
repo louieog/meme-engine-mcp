@@ -1,0 +1,100 @@
+{
+  "concept": "Office worker Monday morning struggle",
+  "format": "relatable",
+  "trend_score": 82,
+  "style": "comedy",
+  "duration_target_seconds": 15,
+  "aspect_ratios": ["9:16", "16:9"],
+  "scenes": [
+    {
+      "scene_id": 1,
+      "beat": "HOOK",
+      "duration_seconds": 3,
+      "visual": "Person's eyes snap open in bed, alarm blaring",
+      "camera": "extreme close-up on eyes",
+      "characters_present": ["worker"],
+      "dialogue": [],
+      "sfx": ["alarm_clock", "record_scratch"],
+      "music_cue": "sudden_stop",
+      "text_overlay": "Monday morning..."
+    },
+    {
+      "scene_id": 2,
+      "beat": "SETUP",
+      "duration_seconds": 5,
+      "visual": "Person staring at coffee machine waiting for coffee",
+      "camera": "medium shot, slightly low angle",
+      "characters_present": ["worker"],
+      "dialogue": [{"character": "worker", "text": "Please... hurry...", "emotion": "desperate"}],
+      "sfx": ["coffee_drip"],
+      "music_cue": "tense_waiting",
+      "text_overlay": ""
+    },
+    {
+      "scene_id": 3,
+      "beat": "PUNCHLINE",
+      "duration_seconds": 4,
+      "visual": "Spilling coffee on white shirt, slow motion",
+      "camera": "slow motion close-up",
+      "characters_present": ["worker"],
+      "dialogue": [],
+      "sfx": ["splash", "dramatic_impact"],
+      "music_cue": "dramatic_fail",
+      "text_overlay": "EVERY. SINGLE. TIME."
+    },
+    {
+      "scene_id": 4,
+      "beat": "RESOLUTION",
+      "duration_seconds": 3,
+      "visual": "Person giving up, lying on floor with coffee stain visible",
+      "camera": "overhead shot",
+      "characters_present": ["worker"],
+      "dialogue": [],
+      "sfx": ["defeat_sound"],
+      "music_cue": "sad_trombone",
+      "text_overlay": "Back to bed?"
+    }
+  ],
+  "characters": [
+    {
+      "id": "worker",
+      "name": "Alex",
+      "description": "Office worker in their late 20s, wearing business casual, tired expression",
+      "reference_images": [
+        "ref/worker_01.png",
+        "ref/worker_02.png"
+      ],
+      "consistency_prompt": "Office worker, late 20s, brown hair, business casual attire, tired expression, white shirt"
+    }
+  ],
+  "audio": {
+    "music_track": "comedic_tension_bed.mp3",
+    "tts_enabled": false,
+    "sfx_required": [
+      "alarm_clock",
+      "record_scratch",
+      "coffee_drip",
+      "splash",
+      "dramatic_impact",
+      "defeat_sound"
+    ]
+  },
+  "generation_requirements": {
+    "character_consistency": true,
+    "lip_sync_needed": false,
+    "models_preferred": {
+      "image": "gemini-3-pro",
+      "video": "kling-v3-omni"
+    },
+    "fallback_chain": [
+      "kling-v3-omni",
+      "runway-gen3",
+      "pika-labs",
+      "luma-dream-machine"
+    ]
+  },
+  "export_formats": {
+    "primary": "9:16",
+    "secondary": ["16:9"]
+  }
+}
