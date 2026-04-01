@@ -24,6 +24,7 @@ Example:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -1445,96 +1446,39 @@ class AssemblyPipeline:
 # ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    import tempfile
+    import argparse
+    import sys
     
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--function", required=True, help="Method name to call")
+    parser.add_argument("--args", required=True, help="JSON string of arguments")
+    parser.add_argument("--output-dir", default="./output", help="Output directory for video files")
+    args = parser.parse_args()
     
-    print("=" * 60)
-    print("Video Assembly Module - Test Examples")
-    print("=" * 60)
+    # Parse arguments
+    try:
+        func_args = json.loads(args.args)
+    except json.JSONDecodeError as e:
+        print(json.dumps({"success": False, "error": f"Invalid JSON: {e}"}))
+        sys.exit(1)
     
-    # Create a temporary directory for test outputs
-    with tempfile.TemporaryDirectory() as tmpdir:
-        output_dir = Path(tmpdir)
-        
-        # Initialize assembler
-        print("\n1. Initializing VideoAssembler...")
-        assembler = VideoAssembler(output_dir=output_dir)
-        print(f"   Output directory: {output_dir}")
-        print(f"   Font detected: {assembler._get_font_path() or 'None'}")
-        
-        # Example 1: Test text escaping
-        print("\n2. Testing text escaping for ffmpeg...")
-        test_texts = [
-            "Hello World",
-            "It's working!",
-            "Special: chars% need escaping",
-            "Line 1\\nLine 2",
-        ]
-        for text in test_texts:
-            escaped = escape_text_for_ffmpeg(text)
-            print(f"   '{text}' -> '{escaped}'")
-        
-        # Example 2: Test position parsing
-        print("\n3. Testing position parsing...")
-        positions = [
-            ("center", "bottom-100"),
-            (100, 200),
-            ("center+50", "top+20"),
-            ("left+10", "right-50"),
-        ]
-        for pos in positions:
-            x, y = parse_position(pos)
-            print(f"   {pos} -> x={x}, y={y}")
-        
-        # Example 3: Test resolution dimensions
-        print("\n4. Testing resolution dimensions...")
-        configs = [
-            ("1080p", "9:16"),
-            ("1080p", "16:9"),
-            ("1080p", "1:1"),
-            ("720p", "9:16"),
-        ]
-        for res, ar in configs:
-            w, h = get_resolution_dimensions(res, ar)
-            print(f"   {res} {ar} -> {w}x{h}")
-        
-        # Example 4: Show example ffmpeg commands
-        print("\n5. Example ffmpeg commands generated:")
-        
-        # Still image command
-        print("\n   a) Still image to video:")
-        print(f"      ffmpeg -loop 1 -i image.png -c:v libx264 -t 5 -pix_fmt yuv420p output.mp4")
-        
-        # Text overlay command
-        print("\n   b) Text overlay:")
-        x, y = parse_position(("center", "bottom-100"))
-        print(f"      ffmpeg -i video.mp4 -vf \"drawtext=text='Hello':x={x}:y={y}...\" output.mp4")
-        
-        # Audio mixing command
-        print("\n   c) Audio mixing:")
-        print(f"      ffmpeg -i video.mp4 -i audio.wav -filter_complex \"[0:a][1:a]amix=inputs=2[aout]\" output.mp4")
-        
-        # Concatenation command
-        print("\n   d) Scene concatenation:")
-        print(f"      ffmpeg -f concat -safe 0 -i concat.txt -c copy output.mp4")
-        
-        # Aspect ratio export
-        print("\n   e) 16:9 export with blurred background:")
-        print(f"      ffmpeg -i input.mp4 -filter_complex \"[0:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,boxblur=30:10[bg];[0:v]scale=-2:1080[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2[out]\" ...")
-        
-        # Thumbnail generation
-        print("\n   f) Thumbnail generation:")
-        print(f"      ffmpeg -i video.mp4 -ss 5 -vframes 1 thumbnail.png")
-        
-        # Example 5: Show assembly pipeline structure
-        print("\n6. AssemblyPipeline structure:")
-        print("   - assemble_scenes(): Process each scene with overlays/audio")
-        print("   - concatenate_scenes(): Join all scene clips")
-        print("   - export_final_videos(): Create 9:16 and 16:9 versions")
-        print("   - generate_thumbnails(): Create thumbnail images")
-        print("   - run_full_assembly(): Complete pipeline execution")
-        
-        print("\n" + "=" * 60)
-        print("All tests completed successfully!")
-        print("=" * 60)
+    # Create client instance
+    client = VideoAssembler(output_dir=args.output_dir)
+    
+    # Get method
+    if not hasattr(client, args.function):
+        print(json.dumps({"success": False, "error": f"Unknown function: {args.function}"}))
+        sys.exit(1)
+    
+    method = getattr(client, args.function)
+    
+    # Call method (handle async)
+    try:
+        if asyncio.iscoroutinefunction(method):
+            result = asyncio.run(method(**func_args))
+        else:
+            result = method(**func_args)
+        print(json.dumps({"success": True, "data": result}))
+    except Exception as e:
+        print(json.dumps({"success": False, "error": str(e)}))
+        sys.exit(1)

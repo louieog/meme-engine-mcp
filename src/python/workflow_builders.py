@@ -4,22 +4,24 @@ ComfyUI Workflow Builders
 
 A reusable Python module for building ComfyUI API-format workflows using
 the builder pattern. Supports image generation, video generation, text-to-speech,
-and lip-sync workflows with fallback chains.
+and lip-sync workflows with fallback chains and model registry integration.
 
 Example:
     >>> from workflow_builders import ImageWorkflowBuilder, VideoWorkflowBuilder
     >>> 
-    >>> # Build an image workflow
+    >>> # Build using model registry key
     >>> builder = ImageWorkflowBuilder()
-    >>> workflow = builder.gemini2(
+    >>> workflow = builder.build_for_model(
+    ...     model_key="GeminiImage2Node:gemini-3-pro-image-preview",
     ...     scene_id=1,
     ...     prompt="A tabby cat wearing glasses",
     ...     aspect_ratio="9:16"
     ... )
     >>> 
-    >>> # Build a video workflow
+    >>> # Build video workflow
     >>> video_builder = VideoWorkflowBuilder()
-    >>> video_workflow = video_builder.kling_omni(
+    >>> video_workflow = video_builder.build_for_model(
+    ...     model_key="KlingOmniProImageToVideoNode",
     ...     cloud_image="scene1-char.png",
     ...     prompt="Cat looking around",
     ...     scene_id=1
@@ -37,6 +39,50 @@ from typing import Any, Callable, Optional
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Model Registry Integration
+# ─────────────────────────────────────────────────────────────────────────────
+
+def parse_model_key(model_key: str) -> tuple[str, Optional[str]]:
+    """Parse colon-separated model key into node class and model name.
+    
+    Args:
+        model_key: Model registry key (e.g., "GeminiImage2Node:gemini-3-pro-image-preview")
+        
+    Returns:
+        Tuple of (node_class, model_name) where model_name may be None
+        
+    Example:
+        >>> parse_model_key("GeminiImage2Node:gemini-3-pro-image-preview")
+        ("GeminiImage2Node", "gemini-3-pro-image-preview")
+        >>> parse_model_key("KlingOmniProImageToVideoNode")
+        ("KlingOmniProImageToVideoNode", None)
+    """
+    if ":" in model_key:
+        node_class, model_name = model_key.split(":", 1)
+        return node_class, model_name
+    return model_key, None
+
+
+def add_submission_metadata(workflow: dict, workflow_name: str = "workflow") -> dict:
+    """Add required submission metadata to workflow.
+    
+    All workflows must include extra_data.api_key_comfy_org for ComfyUI Cloud submission.
+    
+    Args:
+        workflow: The workflow dictionary to augment
+        workflow_name: Name identifier for the workflow
+        
+    Returns:
+        Workflow dict with extra_data added
+    """
+    workflow["extra_data"] = {
+        "api_key_comfy_org": os.environ.get("COMFY_ORG_API_KEY", ""),
+        "workflow_name": workflow_name
+    }
+    return workflow
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -67,30 +113,100 @@ class WorkflowBuilder(ABC):
 class ImageWorkflowBuilder(WorkflowBuilder):
     """Builder for image generation workflows.
     
-    Supports multiple image generation models:
-    - Gemini 2 (gemini-3-pro-image-preview): Primary high-quality model
-    - Gemini Nano: Lightweight fallback
-    - Flux Kontext Pro: Alternative fallback with more control
+    Supports multiple image generation models via model registry keys:
+    - GeminiImage2Node:gemini-3-pro-image-preview: Primary high-quality model
+    - GeminiNanoBanana2: Lightweight fallback
+    - FluxKontextProImageNode: Alternative fallback with more control
     
     Example:
         >>> builder = ImageWorkflowBuilder()
         >>> 
-        >>> # Primary model
-        >>> workflow = builder.gemini2(
+        >>> # Using model registry
+        >>> workflow = builder.build_for_model(
+        ...     model_key="GeminiImage2Node:gemini-3-pro-image-preview",
         ...     scene_id=1,
         ...     prompt="A professional cat news anchor",
-        ...     aspect_ratio="9:16",
-        ...     resolution="2K"
+        ...     aspect_ratio="9:16"
         ... )
         >>> 
-        >>> # Fallback models
+        >>> # Direct methods still work
         >>> nano_workflow = builder.gemini_nano(scene_id=1, prompt="...")
-        >>> flux_workflow = builder.flux_kontext(scene_id=1, prompt="...")
     """
     
     def build(self, **kwargs) -> dict:
         """Default build method - delegates to gemini2."""
         return self.gemini2(**kwargs)
+    
+    def build_for_model(
+        self,
+        model_key: str,
+        scene_id: int,
+        prompt: str,
+        aspect_ratio: str = "9:16",
+        seed: int = 42,
+        **kwargs
+    ) -> dict:
+        """Build workflow for any image model from registry.
+        
+        Args:
+            model_key: Model registry key (e.g., "GeminiImage2Node:gemini-3-pro-image-preview")
+            scene_id: Scene identifier for filename prefixing
+            prompt: The image generation prompt
+            aspect_ratio: Output aspect ratio (default: "9:16")
+            seed: Random seed for reproducibility (default: 42)
+            **kwargs: Additional model-specific parameters
+            
+        Returns:
+            ComfyUI workflow dictionary with appropriate nodes
+            
+        Raises:
+            ValueError: If the model_key is not recognized
+            
+        Example:
+            >>> workflow = builder.build_for_model(
+            ...     model_key="GeminiImage2Node:gemini-3-pro-image-preview",
+            ...     scene_id=1,
+            ...     prompt="A cat news anchor"
+            ... )
+        """
+        node_class, model_name = parse_model_key(model_key)
+        
+        # Build based on node class
+        if "GeminiImage2Node" in node_class:
+            return self.gemini2(
+                scene_id=scene_id,
+                prompt=prompt,
+                aspect_ratio=aspect_ratio,
+                seed=seed,
+                model=model_name or "gemini-3-pro-image-preview",
+                **kwargs
+            )
+        elif "GeminiNanoBanana2" in node_class:
+            return self.gemini_nano(
+                scene_id=scene_id,
+                prompt=prompt,
+                aspect_ratio=aspect_ratio,
+                seed=seed,
+                **kwargs
+            )
+        elif "FluxKontextProImageNode" in node_class:
+            return self.flux_kontext(
+                scene_id=scene_id,
+                prompt=prompt,
+                aspect_ratio=aspect_ratio,
+                seed=seed,
+                **kwargs
+            )
+        elif "FluxUltraImageNode" in node_class:
+            return self.flux_ultra(
+                scene_id=scene_id,
+                prompt=prompt,
+                aspect_ratio=aspect_ratio,
+                seed=seed,
+                **kwargs
+            )
+        else:
+            raise ValueError(f"Unknown image model: {model_key}")
     
     def gemini2(
         self,
@@ -98,33 +214,26 @@ class ImageWorkflowBuilder(WorkflowBuilder):
         prompt: str,
         aspect_ratio: str = "9:16",
         seed: int = 42,
+        model: str = "gemini-3-pro-image-preview",
         resolution: str = "2K",
         thinking_level: str = "MINIMAL"
     ) -> dict:
         """Build GeminiImage2Node workflow.
         
         Creates a workflow using Google's Gemini 2 image generation model
-        (gemini-3-pro-image-preview) which produces high-quality images with
-        excellent prompt understanding.
+        which produces high-quality images with excellent prompt understanding.
         
         Args:
             scene_id: Scene identifier for filename prefixing
             prompt: The image generation prompt
             aspect_ratio: Output aspect ratio (default: "9:16")
             seed: Random seed for reproducibility (default: 42)
+            model: Model identifier (default: "gemini-3-pro-image-preview")
             resolution: Output resolution - "2K" or "1K" (default: "2K")
             thinking_level: Thinking level - "MINIMAL", "MEDIUM", or "HIGH" (default: "MINIMAL")
             
         Returns:
             ComfyUI workflow dictionary with GeminiImage2Node and SaveImage nodes
-            
-        Example:
-            >>> workflow = builder.gemini2(
-            ...     scene_id=1,
-            ...     prompt="A tabby cat news anchor at a desk",
-            ...     aspect_ratio="9:16",
-            ...     seed=12345
-            ... )
         """
         workflow: dict[str, Any] = {
             "1": {
@@ -133,7 +242,7 @@ class ImageWorkflowBuilder(WorkflowBuilder):
                     "prompt": prompt,
                     "aspect_ratio": aspect_ratio,
                     "seed": seed,
-                    "model": "gemini-3-pro-image-preview",
+                    "model": model,
                     "resolution": resolution,
                     "thinking_level": thinking_level
                 }
@@ -146,14 +255,15 @@ class ImageWorkflowBuilder(WorkflowBuilder):
                 }
             }
         }
-        return workflow
+        return add_submission_metadata(workflow, "gemini2-image")
     
     def gemini_nano(
         self,
         scene_id: int,
         prompt: str,
         aspect_ratio: str = "9:16",
-        seed: int = 42
+        seed: int = 42,
+        **kwargs
     ) -> dict:
         """Build GeminiNanoBanana2 fallback workflow.
         
@@ -175,7 +285,8 @@ class ImageWorkflowBuilder(WorkflowBuilder):
                 "inputs": {
                     "prompt": prompt,
                     "aspect_ratio": aspect_ratio,
-                    "seed": seed
+                    "seed": seed,
+                    **kwargs
                 }
             },
             "2": {
@@ -186,7 +297,7 @@ class ImageWorkflowBuilder(WorkflowBuilder):
                 }
             }
         }
-        return workflow
+        return add_submission_metadata(workflow, "gemini-nano")
     
     def flux_kontext(
         self,
@@ -195,7 +306,8 @@ class ImageWorkflowBuilder(WorkflowBuilder):
         aspect_ratio: str = "9:16",
         seed: int = 42,
         guidance: float = 3.5,
-        steps: int = 28
+        steps: int = 28,
+        **kwargs
     ) -> dict:
         """Build FluxKontextProImageNode fallback workflow.
         
@@ -221,7 +333,8 @@ class ImageWorkflowBuilder(WorkflowBuilder):
                     "aspect_ratio": aspect_ratio,
                     "seed": seed,
                     "guidance": guidance,
-                    "steps": steps
+                    "steps": steps,
+                    **kwargs
                 }
             },
             "2": {
@@ -232,7 +345,48 @@ class ImageWorkflowBuilder(WorkflowBuilder):
                 }
             }
         }
-        return workflow
+        return add_submission_metadata(workflow, "flux-kontext")
+    
+    def flux_ultra(
+        self,
+        scene_id: int,
+        prompt: str,
+        aspect_ratio: str = "9:16",
+        seed: int = 42,
+        **kwargs
+    ) -> dict:
+        """Build FluxUltraImageNode workflow.
+        
+        Flux Ultra for highest quality image generation.
+        
+        Args:
+            scene_id: Scene identifier for filename prefixing
+            prompt: The image generation prompt
+            aspect_ratio: Output aspect ratio (default: "9:16")
+            seed: Random seed for reproducibility (default: 42)
+            
+        Returns:
+            ComfyUI workflow dictionary with FluxUltraImageNode
+        """
+        workflow: dict[str, Any] = {
+            "1": {
+                "class_type": "FluxUltraImageNode",
+                "inputs": {
+                    "prompt": prompt,
+                    "aspect_ratio": aspect_ratio,
+                    "seed": seed,
+                    **kwargs
+                }
+            },
+            "2": {
+                "class_type": "SaveImage",
+                "inputs": {
+                    "images": ["1", 0],
+                    "filename_prefix": f"scene{scene_id}-{aspect_ratio.replace(':', 'x')}-char-flux-ultra"
+                }
+            }
+        }
+        return add_submission_metadata(workflow, "flux-ultra")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -242,33 +396,98 @@ class ImageWorkflowBuilder(WorkflowBuilder):
 class VideoWorkflowBuilder(WorkflowBuilder):
     """Builder for video generation workflows.
     
-    Supports video generation from images using Kling models:
-    - Kling Omni Pro v3: Primary with native audio generation
-    - Kling v2 Master: Fallback without audio
+    Supports video generation from images using Kling models via registry keys:
+    - KlingOmniProImageToVideoNode: Primary with native audio generation
+    - KlingImage2VideoNode: Fallback without audio
     
     Example:
         >>> builder = VideoWorkflowBuilder()
         >>> 
-        >>> # With native audio (v3)
-        >>> workflow = builder.kling_omni(
+        >>> # Using model registry
+        >>> workflow = builder.build_for_model(
+        ...     model_key="KlingOmniProImageToVideoNode",
         ...     cloud_image="scene1-char.png",
         ...     prompt="Camera slowly zooms in",
         ...     scene_id=1,
         ...     duration=5,
         ...     generate_audio=True
         ... )
-        >>> 
-        >>> # Silent video (v2)
-        >>> workflow = builder.kling_v2(
-        ...     cloud_image="scene1-char.png",
-        ...     prompt="Slow pan across the scene",
-        ...     scene_id=1
-        ... )
     """
     
     def build(self, **kwargs) -> dict:
         """Default build method - delegates to kling_omni."""
         return self.kling_omni(**kwargs)
+    
+    def build_for_model(
+        self,
+        model_key: str,
+        cloud_image: str,
+        scene_id: int,
+        prompt: str,
+        duration: int = 5,
+        aspect_ratio: str = "9:16",
+        seed: int = 42,
+        generate_audio: bool = False,
+        **kwargs
+    ) -> dict:
+        """Build workflow for any video model from registry.
+        
+        Args:
+            model_key: Model registry key (e.g., "KlingOmniProImageToVideoNode")
+            cloud_image: Filename of image already uploaded to ComfyUI Cloud
+            scene_id: Scene identifier for filename prefixing
+            prompt: Motion prompt describing the video movement
+            duration: Video duration in seconds (default: 5)
+            aspect_ratio: Output aspect ratio (default: "9:16")
+            seed: Random seed for reproducibility (default: 42)
+            generate_audio: Whether to generate native audio (default: False)
+            **kwargs: Additional model-specific parameters
+            
+        Returns:
+            ComfyUI workflow dictionary with appropriate nodes
+            
+        Raises:
+            ValueError: If the model_key is not recognized
+        """
+        node_class, model_name = parse_model_key(model_key)
+        
+        if "KlingOmniProImageToVideoNode" in node_class:
+            return self.kling_omni(
+                cloud_image=cloud_image,
+                prompt=prompt,
+                scene_id=scene_id,
+                duration=duration,
+                aspect_ratio=aspect_ratio,
+                seed=seed,
+                generate_audio=generate_audio,
+                **kwargs
+            )
+        elif "KlingImage2VideoNode" in node_class:
+            return self.kling_v2(
+                cloud_image=cloud_image,
+                prompt=prompt,
+                scene_id=scene_id,
+                aspect_ratio=aspect_ratio,
+                duration=str(duration),
+                **kwargs
+            )
+        elif "LumaDreamMachineNode" in node_class:
+            return self.luma_dream_machine(
+                cloud_image=cloud_image,
+                prompt=prompt,
+                scene_id=scene_id,
+                aspect_ratio=aspect_ratio,
+                **kwargs
+            )
+        elif "RunwayGen3Node" in node_class:
+            return self.runway_gen3(
+                cloud_image=cloud_image,
+                prompt=prompt,
+                scene_id=scene_id,
+                **kwargs
+            )
+        else:
+            raise ValueError(f"Unknown video model: {model_key}")
     
     def kling_omni(
         self,
@@ -278,7 +497,8 @@ class VideoWorkflowBuilder(WorkflowBuilder):
         duration: int = 5,
         aspect_ratio: str = "9:16",
         generate_audio: bool = True,
-        seed: int = 100
+        seed: int = 100,
+        **kwargs
     ) -> dict:
         """Build KlingOmniProImageToVideoNode workflow (v3 with native audio).
         
@@ -297,14 +517,8 @@ class VideoWorkflowBuilder(WorkflowBuilder):
         Returns:
             ComfyUI workflow dictionary with KlingOmniProImageToVideoNode
             
-        Example:
-            >>> workflow = builder.kling_omni(
-            ...     cloud_image="scene1-9x16-char_0001_.png",
-            ...     prompt="Camera slowly pans left across the news desk",
-            ...     scene_id=1,
-            ...     duration=5,
-            ...     generate_audio=True
-            ... )
+        Note:
+            SaveVideo format is "mp4" (not "video/h264-mp4") per proven schema.
         """
         workflow: dict[str, Any] = {
             "1": {
@@ -315,18 +529,20 @@ class VideoWorkflowBuilder(WorkflowBuilder):
                     "duration": duration,
                     "aspect_ratio": aspect_ratio,
                     "generate_audio": generate_audio,
-                    "seed": seed
+                    "seed": seed,
+                    **kwargs
                 }
             },
             "2": {
                 "class_type": "SaveVideo",
                 "inputs": {
                     "video": ["1", 0],
-                    "filename_prefix": f"scene{scene_id}-{aspect_ratio.replace(':', 'x')}-video"
+                    "filename_prefix": f"scene{scene_id}-{aspect_ratio.replace(':', 'x')}-video",
+                    "format": "mp4"  # Proven schema: use "mp4" not "video/h264-mp4"
                 }
             }
         }
-        return workflow
+        return add_submission_metadata(workflow, "kling-omni-v3")
     
     def kling_v2(
         self,
@@ -335,7 +551,8 @@ class VideoWorkflowBuilder(WorkflowBuilder):
         scene_id: int,
         aspect_ratio: str = "9:16",
         duration: str = "5",
-        cfg_scale: float = 0.8
+        cfg_scale: float = 0.8,
+        **kwargs
     ) -> dict:
         """Build KlingImage2VideoNode workflow (v2, silent).
         
@@ -352,6 +569,9 @@ class VideoWorkflowBuilder(WorkflowBuilder):
             
         Returns:
             ComfyUI workflow dictionary with KlingImage2VideoNode
+            
+        Note:
+            SaveVideo format is "mp4" per proven schema.
         """
         workflow: dict[str, Any] = {
             "1": {
@@ -361,18 +581,101 @@ class VideoWorkflowBuilder(WorkflowBuilder):
                     "prompt": prompt,
                     "aspect_ratio": aspect_ratio,
                     "duration": duration,
-                    "cfg_scale": cfg_scale
+                    "cfg_scale": cfg_scale,
+                    **kwargs
                 }
             },
             "2": {
                 "class_type": "SaveVideo",
                 "inputs": {
                     "video": ["1", 0],
-                    "filename_prefix": f"scene{scene_id}-{aspect_ratio.replace(':', 'x')}-video-v2"
+                    "filename_prefix": f"scene{scene_id}-{aspect_ratio.replace(':', 'x')}-video-v2",
+                    "format": "mp4"  # Proven schema: use "mp4" not "video/h264-mp4"
                 }
             }
         }
-        return workflow
+        return add_submission_metadata(workflow, "kling-v2")
+    
+    def luma_dream_machine(
+        self,
+        cloud_image: str,
+        prompt: str,
+        scene_id: int,
+        aspect_ratio: str = "9:16",
+        **kwargs
+    ) -> dict:
+        """Build Luma Dream Machine workflow.
+        
+        Alternative video generation model.
+        
+        Args:
+            cloud_image: Filename of image already uploaded to ComfyUI Cloud
+            prompt: Motion prompt describing the video movement
+            scene_id: Scene identifier for filename prefixing
+            aspect_ratio: Output aspect ratio (default: "9:16")
+            
+        Returns:
+            ComfyUI workflow dictionary with LumaDreamMachineNode
+        """
+        workflow: dict[str, Any] = {
+            "1": {
+                "class_type": "LumaDreamMachineNode",
+                "inputs": {
+                    "image": cloud_image,
+                    "prompt": prompt,
+                    "aspect_ratio": aspect_ratio,
+                    **kwargs
+                }
+            },
+            "2": {
+                "class_type": "SaveVideo",
+                "inputs": {
+                    "video": ["1", 0],
+                    "filename_prefix": f"scene{scene_id}-{aspect_ratio.replace(':', 'x')}-video-luma",
+                    "format": "mp4"
+                }
+            }
+        }
+        return add_submission_metadata(workflow, "luma-dream-machine")
+    
+    def runway_gen3(
+        self,
+        cloud_image: str,
+        prompt: str,
+        scene_id: int,
+        **kwargs
+    ) -> dict:
+        """Build Runway Gen-3 workflow.
+        
+        Alternative video generation model from Runway.
+        
+        Args:
+            cloud_image: Filename of image already uploaded to ComfyUI Cloud
+            prompt: Motion prompt describing the video movement
+            scene_id: Scene identifier for filename prefixing
+            
+        Returns:
+            ComfyUI workflow dictionary with RunwayGen3Node
+        """
+        workflow: dict[str, Any] = {
+            "1": {
+                "class_type": "RunwayGen3Node",
+                "inputs": {
+                    "image": cloud_image,
+                    "prompt": prompt,
+                    **kwargs
+                }
+            },
+            "2": {
+                "class_type": "SaveVideo",
+                "inputs": {
+                    "video": ["1", 0],
+                    "filename_prefix": f"scene{scene_id}-video-runway",
+                    "format": "mp4"
+                }
+            }
+        }
+        return add_submission_metadata(workflow, "runway-gen3")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -385,19 +688,92 @@ class TTSWorkflowBuilder(WorkflowBuilder):
     Uses ElevenLabs for high-quality voice synthesis with support for
     voice selection, speed control, and emotional tuning.
     
+    Schema notes (proven from API):
+    - Voice uses full label format: "George (male, british)"
+    - Model parameters use dot notation: "model.speed", "model.stability"
+    - SaveAudio uses filename_prefix (not filename)
+    
     Example:
         >>> builder = TTSWorkflowBuilder()
-        >>> workflow = builder.elevenlabs(
+        >>> workflow = builder.build(
         ...     text="Welcome to the Feline Report!",
         ...     scene_id=1,
         ...     voice="George (male, british)",
-        ...     speed=0.9
+        ...     line_index=0
         ... )
     """
     
-    def build(self, **kwargs) -> dict:
-        """Default build method - delegates to elevenlabs."""
-        return self.elevenlabs(**kwargs)
+    def build(
+        self,
+        text: str,
+        scene_id: int = 1,
+        line_index: int = 0,
+        voice: str = "George (male, british)",
+        speed: float = 0.9,
+        stability: float = 0.5,
+        similarity_boost: float = 0.8,
+        model_id: str = "eleven_v3",
+        seed: int = 42
+    ) -> dict:
+        """ElevenLabs TTS with correct dot-notation schema.
+        
+        Creates a workflow with:
+        1. ElevenLabsVoiceSelector - selects the voice
+        2. ElevenLabsTextToSpeech - generates audio with dot-notation model params
+        3. SaveAudio - saves with filename_prefix
+        
+        Args:
+            text: The text to synthesize into speech
+            scene_id: Scene identifier for filename prefixing
+            line_index: Line number within the scene (default: 0)
+            voice: Voice model name with label format (default: "George (male, british)")
+            speed: Speech speed multiplier (default: 0.9)
+            stability: Voice stability 0.0-1.0 (default: 0.5)
+            similarity_boost: Clarity boost 0.0-1.0 (default: 0.8)
+            model_id: ElevenLabs model ID (default: "eleven_v3")
+            seed: Random seed for reproducibility (default: 42)
+            
+        Returns:
+            ComfyUI workflow dictionary with ElevenLabs nodes
+            
+        Example:
+            >>> workflow = builder.build(
+            ...     text="Breaking news from the Feline Report!",
+            ...     scene_id=1,
+            ...     line_index=0,
+            ...     voice="George (male, british)"
+            ... )
+        """
+        workflow: dict[str, Any] = {
+            "1": {
+                "class_type": "ElevenLabsVoiceSelector",
+                "inputs": {
+                    "voice": voice  # Full label format: "George (male, british)"
+                }
+            },
+            "2": {
+                "class_type": "ElevenLabsTextToSpeech",
+                "inputs": {
+                    "voice": ["1", 0],
+                    "text": text,
+                    # Dot notation for model sub-inputs (proven schema)
+                    "model.speed": speed,
+                    "model.stability": stability,
+                    "model.similarity_boost": similarity_boost,
+                    "model_id": model_id,
+                    "seed": seed + scene_id * 10 + line_index
+                }
+            },
+            "3": {
+                "class_type": "SaveAudio",
+                "inputs": {
+                    "audio": ["2", 0],
+                    "filename_prefix": f"audio/scene{scene_id}-line{line_index}"
+                    # Note: uses filename_prefix (proven schema)
+                }
+            }
+        }
+        return add_submission_metadata(workflow, "elevenlabs-tts")
     
     def elevenlabs(
         self,
@@ -406,67 +782,24 @@ class TTSWorkflowBuilder(WorkflowBuilder):
         line_index: int = 0,
         voice: str = "George (male, british)",
         speed: float = 0.9,
-        stability: float = 0.4,
+        stability: float = 0.5,
         similarity_boost: float = 0.8,
         seed: int = 42
     ) -> dict:
-        """Build ElevenLabsTextToSpeech workflow.
+        """Build ElevenLabsTextToSpeech workflow (legacy method).
         
-        Creates a workflow for text-to-speech generation using ElevenLabs API.
-        
-        IMPORTANT: ElevenLabs uses dot-notation for model sub-inputs:
-            "model.speed": 0.9
-            "model.similarity_boost": 0.8
-            
-        Available voices include:
-        - "George (male, british)" - Professional news anchor voice
-        - "Rachel" - Female American voice
-        - "Adam" - Male American voice
-        - "Antoni" - Male voice with warmth
-        
-        Args:
-            text: The text to synthesize into speech
-            scene_id: Scene identifier for filename prefixing
-            line_index: Line number within the scene (default: 0)
-            voice: Voice model name (default: "George (male, british)")
-            speed: Speech speed multiplier - 0.5 to 1.5 (default: 0.9)
-            stability: Voice stability - 0.0 to 1.0 (default: 0.4)
-            similarity_boost: Clarity/similarity boost - 0.0 to 1.0 (default: 0.8)
-            seed: Random seed for reproducibility (default: 42)
-            
-        Returns:
-            ComfyUI workflow dictionary with ElevenLabsTextToSpeech node
-            
-        Example:
-            >>> workflow = builder.elevenlabs(
-            ...     text="Breaking news from the Feline Report!",
-            ...     scene_id=1,
-            ...     line_index=0,
-            ...     voice="George (male, british)",
-            ...     speed=0.85
-            ... )
+        Maintained for backward compatibility. Prefer using build() method.
         """
-        workflow: dict[str, Any] = {
-            "1": {
-                "class_type": "ElevenLabsTextToSpeech",
-                "inputs": {
-                    "text": text,
-                    "voice": voice,
-                    "seed": seed,
-                    "model.speed": speed,
-                    "model.stability": stability,
-                    "model.similarity_boost": similarity_boost
-                }
-            },
-            "2": {
-                "class_type": "SaveAudio",
-                "inputs": {
-                    "audio": ["1", 0],
-                    "filename_prefix": f"scene{scene_id}-tts-{line_index:02d}"
-                }
-            }
-        }
-        return workflow
+        return self.build(
+            text=text,
+            scene_id=scene_id,
+            line_index=line_index,
+            voice=voice,
+            speed=speed,
+            stability=stability,
+            similarity_boost=similarity_boost,
+            seed=seed
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -477,64 +810,84 @@ class LipSyncWorkflowBuilder(WorkflowBuilder):
     """Builder for lip-sync workflows.
     
     Synchronizes video with audio to create talking head videos.
-    Uses sync models to match lip movements with spoken audio.
+    Uses Kling lip sync models to match lip movements with spoken audio.
     
     Example:
         >>> builder = LipSyncWorkflowBuilder()
         >>> workflow = builder.build(
-        ...     video_path="scene1-video.mp4",
-        ...     audio_path="scene1-tts-00.mp3",
-        ...     scene_id=1,
-        ...     model="sync-1.6.0"
+        ...     video_file="scene1-video.mp4",
+        ...     audio_file="scene1-tts-00.mp3",
+        ...     scene_id=1
         ... )
     """
     
     def build(
         self,
-        video_path: str,
-        audio_path: str,
+        video_file: str,
+        audio_file: str,
         scene_id: int,
-        model: str = "sync-1.6.0"
+        model_key: str = "KlingLipSyncAudioToVideoNode",
+        **kwargs
     ) -> dict:
-        """Build lip-sync workflow.
+        """Kling lip sync workflow.
         
-        Creates a workflow that synchronizes a video with audio to match
-        lip movements with the spoken words.
+        Creates a workflow that:
+        1. Loads the video file
+        2. Loads the audio file
+        3. Applies lip sync to synchronize lips with audio
+        4. Saves the synchronized video as mp4
         
         Args:
-            video_path: Cloud filename of the video to sync
-            audio_path: Cloud filename of the audio to sync with
+            video_file: Cloud filename of the video to sync
+            audio_file: Cloud filename of the audio to sync with
             scene_id: Scene identifier for filename prefixing
-            model: Lip-sync model version (default: "sync-1.6.0")
+            model_key: Lip-sync model class name (default: "KlingLipSyncAudioToVideoNode")
+            **kwargs: Additional model-specific parameters
             
         Returns:
-            ComfyUI workflow dictionary with lip-sync node
+            ComfyUI workflow dictionary with lip-sync nodes
+            
+        Note:
+            SaveVideo format is "mp4" (proven schema).
             
         Example:
             >>> workflow = builder.build(
-            ...     video_path="scene1-9x16-video_0001_.mp4",
-            ...     audio_path="scene1-tts-00.wav",
+            ...     video_file="scene1-9x16-video_0001_.mp4",
+            ...     audio_file="scene1-tts-00.wav",
             ...     scene_id=1
             ... )
         """
         workflow: dict[str, Any] = {
             "1": {
-                "class_type": "LipSyncNode",
+                "class_type": "LoadVideo",
                 "inputs": {
-                    "video": video_path,
-                    "audio": audio_path,
-                    "model": model
+                    "video": video_file
                 }
             },
             "2": {
-                "class_type": "SaveVideo",
+                "class_type": "LoadAudio",
+                "inputs": {
+                    "audio": audio_file
+                }
+            },
+            "3": {
+                "class_type": model_key,
                 "inputs": {
                     "video": ["1", 0],
-                    "filename_prefix": f"scene{scene_id}-sync"
+                    "audio": ["2", 0],
+                    **kwargs
+                }
+            },
+            "4": {
+                "class_type": "SaveVideo",
+                "inputs": {
+                    "video": ["3", 0],
+                    "filename_prefix": f"video/scene{scene_id}-lipsync",
+                    "format": "mp4"  # Proven schema: use "mp4"
                 }
             }
         }
-        return workflow
+        return add_submission_metadata(workflow, "lip-sync")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -886,6 +1239,21 @@ def _test_builders():
     
     image_builder = ImageWorkflowBuilder()
     
+    # Test build_for_model with colon-separated key
+    workflow_from_registry = image_builder.build_for_model(
+        model_key="GeminiImage2Node:gemini-3-pro-image-preview",
+        scene_id=1,
+        prompt="A professional tabby cat news anchor",
+        aspect_ratio="9:16",
+        seed=42
+    )
+    assert "1" in workflow_from_registry
+    assert workflow_from_registry["1"]["class_type"] == "GeminiImage2Node"
+    assert workflow_from_registry["1"]["inputs"]["model"] == "gemini-3-pro-image-preview"
+    assert "extra_data" in workflow_from_registry
+    assert "api_key_comfy_org" in workflow_from_registry["extra_data"]
+    print("✓ build_for_model with registry key works")
+    
     # Test Gemini 2
     gemini_workflow = image_builder.gemini2(
         scene_id=1,
@@ -906,6 +1274,7 @@ def _test_builders():
         seed=123
     )
     assert nano_workflow["1"]["class_type"] == "GeminiNanoBanana2"
+    assert "extra_data" in nano_workflow
     print("✓ Gemini Nano workflow built successfully")
     
     # Test Flux Kontext
@@ -925,6 +1294,21 @@ def _test_builders():
     
     video_builder = VideoWorkflowBuilder()
     
+    # Test build_for_model
+    video_from_registry = video_builder.build_for_model(
+        model_key="KlingOmniProImageToVideoNode",
+        cloud_image="scene1-char.png",
+        scene_id=1,
+        prompt="Camera slowly pans",
+        duration=5,
+        aspect_ratio="9:16",
+        seed=42
+    )
+    assert video_from_registry["1"]["class_type"] == "KlingOmniProImageToVideoNode"
+    assert video_from_registry["2"]["inputs"]["format"] == "mp4"
+    assert "extra_data" in video_from_registry
+    print("✓ build_for_model with video registry key works")
+    
     # Test Kling Omni
     omni_workflow = video_builder.kling_omni(
         cloud_image="scene1-9x16-char_0001_.png",
@@ -935,6 +1319,7 @@ def _test_builders():
     )
     assert omni_workflow["1"]["class_type"] == "KlingOmniProImageToVideoNode"
     assert omni_workflow["1"]["inputs"]["generate_audio"] is True
+    assert omni_workflow["2"]["inputs"]["format"] == "mp4"
     print("✓ Kling Omni v3 workflow built successfully")
     
     # Test Kling v2
@@ -944,6 +1329,7 @@ def _test_builders():
         scene_id=1
     )
     assert v2_workflow["1"]["class_type"] == "KlingImage2VideoNode"
+    assert v2_workflow["2"]["inputs"]["format"] == "mp4"
     print("✓ Kling v2 workflow built successfully")
     
     # Test TTSWorkflowBuilder
@@ -952,17 +1338,34 @@ def _test_builders():
     
     tts_builder = TTSWorkflowBuilder()
     
-    tts_workflow = tts_builder.elevenlabs(
+    # Test new build() method with correct schema
+    tts_workflow = tts_builder.build(
         text="Welcome to the Feline Report!",
         scene_id=1,
         line_index=0,
-        voice="George (male, british)",
-        speed=0.9
+        voice="George (male, british)"
     )
-    assert tts_workflow["1"]["class_type"] == "ElevenLabsTextToSpeech"
-    assert tts_workflow["1"]["inputs"]["model.speed"] == 0.9
-    assert tts_workflow["1"]["inputs"]["model.similarity_boost"] == 0.8
-    print("✓ ElevenLabs TTS workflow built successfully")
+    assert tts_workflow["1"]["class_type"] == "ElevenLabsVoiceSelector"
+    assert tts_workflow["1"]["inputs"]["voice"] == "George (male, british)"
+    assert tts_workflow["2"]["class_type"] == "ElevenLabsTextToSpeech"
+    assert tts_workflow["2"]["inputs"]["model.speed"] == 0.9
+    assert tts_workflow["2"]["inputs"]["model.stability"] == 0.5
+    assert tts_workflow["2"]["inputs"]["model.similarity_boost"] == 0.8
+    assert tts_workflow["3"]["class_type"] == "SaveAudio"
+    assert "filename_prefix" in tts_workflow["3"]["inputs"]
+    assert tts_workflow["3"]["inputs"]["filename_prefix"] == "audio/scene1-line0"
+    assert "extra_data" in tts_workflow
+    print("✓ ElevenLabs TTS workflow built with correct schema")
+    
+    # Test legacy elevenlabs() method
+    legacy_tts = tts_builder.elevenlabs(
+        text="Test text",
+        scene_id=2,
+        line_index=1,
+        voice="George (male, british)"
+    )
+    assert legacy_tts["2"]["class_type"] == "ElevenLabsTextToSpeech"
+    print("✓ Legacy elevenlabs() method works")
     
     # Test LipSyncWorkflowBuilder
     print("\n🎭 Lip Sync Workflow Builder Tests")
@@ -971,18 +1374,41 @@ def _test_builders():
     lip_builder = LipSyncWorkflowBuilder()
     
     lip_workflow = lip_builder.build(
-        video_path="scene1-9x16-video_0001_.mp4",
-        audio_path="scene1-tts-00.wav",
-        scene_id=1,
-        model="sync-1.6.0"
+        video_file="scene1-9x16-video_0001_.mp4",
+        audio_file="scene1-tts-00.wav",
+        scene_id=1
     )
-    assert lip_workflow["1"]["class_type"] == "LipSyncNode"
-    assert lip_workflow["1"]["inputs"]["model"] == "sync-1.6.0"
-    print("✓ Lip Sync workflow built successfully")
+    assert lip_workflow["1"]["class_type"] == "LoadVideo"
+    assert lip_workflow["2"]["class_type"] == "LoadAudio"
+    assert lip_workflow["3"]["class_type"] == "KlingLipSyncAudioToVideoNode"
+    assert lip_workflow["4"]["class_type"] == "SaveVideo"
+    assert lip_workflow["4"]["inputs"]["format"] == "mp4"
+    assert lip_workflow["4"]["inputs"]["filename_prefix"] == "video/scene1-lipsync"
+    assert "extra_data" in lip_workflow
+    print("✓ Kling Lip Sync workflow built successfully")
+    
+    # Test custom lip sync model key
+    custom_lip = lip_builder.build(
+        video_file="test.mp4",
+        audio_file="test.wav",
+        scene_id=2,
+        model_key="CustomLipSyncNode"
+    )
+    assert custom_lip["3"]["class_type"] == "CustomLipSyncNode"
+    print("✓ Custom lip sync model key works")
     
     # Test Helper Functions
     print("\n🔧 Helper Functions Tests")
     print("-" * 40)
+    
+    # Test parse_model_key
+    node_class, model_name = parse_model_key("GeminiImage2Node:gemini-3-pro-image-preview")
+    assert node_class == "GeminiImage2Node"
+    assert model_name == "gemini-3-pro-image-preview"
+    node_class2, model_name2 = parse_model_key("KlingOmniProImageToVideoNode")
+    assert node_class2 == "KlingOmniProImageToVideoNode"
+    assert model_name2 is None
+    print("✓ parse_model_key works correctly")
     
     # Test build_scene_image_prompt
     prompt = build_scene_image_prompt(
@@ -1042,6 +1468,33 @@ def _test_builders():
     assert video_chain[0][0] == "kling-v3-omni"
     print(f"✓ Video fallback chain created with {len(video_chain)} models")
     
+    # Test Error Handling
+    print("\n🚨 Error Handling Tests")
+    print("-" * 40)
+    
+    try:
+        image_builder.build_for_model(
+            model_key="UnknownModel:something",
+            scene_id=1,
+            prompt="Test"
+        )
+        assert False, "Should have raised ValueError"
+    except ValueError as e:
+        assert "Unknown image model" in str(e)
+        print("✓ Unknown image model raises ValueError")
+    
+    try:
+        video_builder.build_for_model(
+            model_key="UnknownVideoModel",
+            cloud_image="test.png",
+            scene_id=1,
+            prompt="Test"
+        )
+        assert False, "Should have raised ValueError"
+    except ValueError as e:
+        assert "Unknown video model" in str(e)
+        print("✓ Unknown video model raises ValueError")
+    
     # Print sample workflows
     print("\n📋 Sample Workflow Outputs")
     print("-" * 40)
@@ -1049,8 +1502,11 @@ def _test_builders():
     print("\n--- Gemini 2 Workflow (excerpt) ---")
     print(json.dumps(gemini_workflow, indent=2)[:500] + "...")
     
-    print("\n--- ElevenLabs TTS Workflow (excerpt) ---")
-    print(json.dumps(tts_workflow, indent=2)[:500] + "...")
+    print("\n--- ElevenLabs TTS Workflow (full) ---")
+    print(json.dumps(tts_workflow, indent=2))
+    
+    print("\n--- Kling Lip Sync Workflow (full) ---")
+    print(json.dumps(lip_workflow, indent=2))
     
     print("\n" + "=" * 70)
     print("All tests passed! ✅")

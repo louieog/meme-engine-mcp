@@ -1,12 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { Info } from "lucide-react";
+import {
+  IMAGE_MODELS,
+  VIDEO_MODELS,
+  TTS_MODELS,
+  LIP_SYNC_MODELS,
+  FORMAT_DESCRIPTIONS,
+} from "@/lib/models";
 
 const formats = [
-  { id: "mini-drama", name: "Mini Drama", description: "Short character-driven skits" },
+  { id: "auto", name: "Auto (AI Recommended)", description: "Let AI pick the best format" },
+  { id: "mini-drama", name: "Mini Drama", description: "Short character-driven skits with narrative arcs" },
   { id: "text-meme", name: "Text Meme", description: "Text overlays on video/image" },
   { id: "reaction", name: "Reaction", description: "Commentary on existing content" },
   { id: "skit", name: "Skit", description: "Short comedy scenes" },
+  { id: "custom", name: "Custom", description: "Define your own format" },
 ];
 
 const styles = [
@@ -19,12 +29,31 @@ const styles = [
 
 export default function CreatePage() {
   const [concept, setConcept] = useState("");
-  const [format, setFormat] = useState("mini-drama");
+  const [format, setFormat] = useState("auto");
   const [style, setStyle] = useState("relatable");
   const [duration, setDuration] = useState(30);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [requestId, setRequestId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Model selections
+  const [imageModel, setImageModel] = useState("auto");
+  const [videoModel, setVideoModel] = useState("auto");
+  const [voice, setVoice] = useState("auto");
+  const [lipSync, setLipSync] = useState("auto");
+
+  // Derived state for native audio detection
+  const selectedVideoModel = VIDEO_MODELS.find((m) => m.value === videoModel);
+  const videoHasAudio = selectedVideoModel?.hasAudio ?? false;
+
+  function handleVideoModelChange(val: string) {
+    setVideoModel(val);
+    const model = VIDEO_MODELS.find((m) => m.value === val);
+    if (model?.hasAudio) {
+      setVoice("none");
+      setLipSync("none");
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +69,12 @@ export default function CreatePage() {
           format,
           style,
           duration_target_seconds: duration,
+          models: {
+            image: imageModel,
+            video: videoModel,
+            tts: voice,
+            lip_sync: lipSync,
+          },
         }),
       });
 
@@ -137,6 +172,16 @@ export default function CreatePage() {
               </button>
             ))}
           </div>
+
+          {/* Format description info box */}
+          {FORMAT_DESCRIPTIONS[format] && (
+            <div className="flex gap-3 p-3 bg-secondary/50 rounded-lg border border-border/50 mt-4">
+              <Info className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {FORMAT_DESCRIPTIONS[format]}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Style Selection */}
@@ -160,6 +205,91 @@ export default function CreatePage() {
                 {s.name}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Model Selection */}
+        <div className="glass rounded-2xl p-6 space-y-4">
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Model Configuration
+          </label>
+
+          {/* Image Model */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Image Model</label>
+            <select
+              value={imageModel}
+              onChange={(e) => setImageModel(e.target.value)}
+              className="w-full px-4 py-2 rounded-xl bg-black/30 border border-white/10 text-white"
+            >
+              {IMAGE_MODELS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Video Model */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Video Model</label>
+            <select
+              value={videoModel}
+              onChange={(e) => handleVideoModelChange(e.target.value)}
+              className="w-full px-4 py-2 rounded-xl bg-black/30 border border-white/10 text-white"
+            >
+              {VIDEO_MODELS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Native audio banner */}
+          {videoHasAudio && (
+            <div className="bg-primary/10 border border-primary/20 rounded-lg px-3 py-2">
+              <p className="text-xs text-primary">
+                {selectedVideoModel?.label} generates audio natively — TTS and lip
+                sync stages will be skipped.
+              </p>
+            </div>
+          )}
+
+          {/* TTS Model */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">
+              Text-to-Speech Voice
+            </label>
+            <select
+              value={voice}
+              onChange={(e) => setVoice(e.target.value)}
+              disabled={videoHasAudio}
+              className="w-full px-4 py-2 rounded-xl bg-black/30 border border-white/10 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {TTS_MODELS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Lip Sync Model */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Lip Sync</label>
+            <select
+              value={lipSync}
+              onChange={(e) => setLipSync(e.target.value)}
+              disabled={videoHasAudio}
+              className="w-full px-4 py-2 rounded-xl bg-black/30 border border-white/10 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {LIP_SYNC_MODELS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

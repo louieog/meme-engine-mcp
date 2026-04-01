@@ -652,12 +652,46 @@ async def _test_client():
 
 
 if __name__ == "__main__":
-    # Configure logging for test mode
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%H:%M:%S"
-    )
+    import argparse
+    import sys
     
-    # Run tests
-    asyncio.run(_test_client())
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--function", required=True, help="Method name to call")
+    parser.add_argument("--args", required=True, help="JSON string of arguments")
+    parser.add_argument("--api-key", default=None, help="ComfyUI Cloud API key")
+    parser.add_argument("--base-url", default="https://cloud.comfy.org", help="ComfyUI Cloud base URL")
+    args = parser.parse_args()
+    
+    # Parse arguments
+    try:
+        func_args = json.loads(args.args)
+    except json.JSONDecodeError as e:
+        print(json.dumps({"success": False, "error": f"Invalid JSON: {e}"}))
+        sys.exit(1)
+    
+    # Get API key from args or environment
+    api_key = args.api_key or os.environ.get("COMFY_CLOUD_API_KEY")
+    if not api_key:
+        print(json.dumps({"success": False, "error": "API key required. Provide --api-key or set COMFY_CLOUD_API_KEY"}))
+        sys.exit(1)
+    
+    # Create client instance
+    client = ComfyUIClient(api_key=api_key, base_url=args.base_url)
+    
+    # Get method
+    if not hasattr(client, args.function):
+        print(json.dumps({"success": False, "error": f"Unknown function: {args.function}"}))
+        sys.exit(1)
+    
+    method = getattr(client, args.function)
+    
+    # Call method (handle async)
+    try:
+        if asyncio.iscoroutinefunction(method):
+            result = asyncio.run(method(**func_args))
+        else:
+            result = method(**func_args)
+        print(json.dumps({"success": True, "data": result}))
+    except Exception as e:
+        print(json.dumps({"success": False, "error": str(e)}))
+        sys.exit(1)

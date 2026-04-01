@@ -1,0 +1,33 @@
+{
+  "name": "meme-engine-server-claude",
+  "version": "1.0.0",
+  "description": "Meme Engine Server with Claude Orchestration",
+  "type": "module",
+  "bin": {
+    "meme-engine-server-claude": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepare": "npm run build",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "keywords": [
+    "mcp",
+    "meme",
+    "video",
+    "claude",
+    "orchestration"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.0"
+  }
+}

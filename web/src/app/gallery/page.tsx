@@ -4,14 +4,42 @@ import { useEffect, useState } from "react";
 
 interface VideoOutput {
   id: string;
+  date: string;
   concept: string;
-  format: string;
-  created_at: string;
+  slug: string;
+  duration: number;
   thumbnail?: string;
-  files: {
-    "9x16"?: string;
-    "16x9"?: string;
+  video_file: string;
+  metadata?: any;
+}
+
+// Normalize metadata reading (handle both patterns)
+function normalizeMetadata(video: VideoOutput) {
+  // Try metadata field first
+  if (video.metadata) return video.metadata;
+  
+  // Fallback
+  return {
+    concept: video.concept || 'Unknown',
+    duration: video.duration || 0,
+    createdAt: video.date || new Date().toISOString()
   };
+}
+
+// Get video URL in format: /api/outputs/{date}/{path}
+function getVideoUrl(video: VideoOutput) {
+  const date = video.date || new Date().toISOString().split('T')[0];
+  const filePath = video.video_file;
+  return `/api/outputs/${date}/${filePath}`;
+}
+
+// Get thumbnail URL
+function getThumbnailUrl(video: VideoOutput) {
+  if (video.thumbnail && !video.thumbnail.startsWith('http')) {
+    const date = video.date || new Date().toISOString().split('T')[0];
+    return `/api/outputs/${date}/${video.thumbnail}`;
+  }
+  return video.thumbnail;
 }
 
 export default function GalleryPage() {
@@ -24,9 +52,10 @@ export default function GalleryPage() {
 
   const fetchVideos = async () => {
     try {
-      const response = await fetch("/api/outputs");
+      const response = await fetch("/api/gallery");
       const data = await response.json();
-      setVideos(data.videos || []);
+      // Fix: data.videos -> data.outputs
+      setVideos(data.outputs || []);
     } catch (error) {
       console.error("Failed to fetch videos:", error);
     } finally {
@@ -74,6 +103,10 @@ export default function GalleryPage() {
 
 function VideoCard({ video }: { video: VideoOutput }) {
   const [isHovered, setIsHovered] = useState(false);
+  
+  const metadata = normalizeMetadata(video);
+  const videoUrl = getVideoUrl(video);
+  const thumbnailUrl = getThumbnailUrl(video);
 
   return (
     <div
@@ -83,9 +116,9 @@ function VideoCard({ video }: { video: VideoOutput }) {
     >
       {/* Thumbnail */}
       <div className="aspect-video bg-gray-800 relative overflow-hidden">
-        {video.thumbnail ? (
+        {thumbnailUrl ? (
           <img
-            src={video.thumbnail}
+            src={thumbnailUrl}
             alt={video.concept}
             className="w-full h-full object-cover"
           />
@@ -96,34 +129,23 @@ function VideoCard({ video }: { video: VideoOutput }) {
         )}
         {isHovered && (
           <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-4">
-            {video.files["9x16"] && (
-              <a
-                href={video.files["9x16"]}
-                download
-                className="px-4 py-2 bg-purple-600 rounded-lg font-medium hover:bg-purple-700 transition-colors"
-              >
-                9:16
-              </a>
-            )}
-            {video.files["16x9"] && (
-              <a
-                href={video.files["16x9"]}
-                download
-                className="px-4 py-2 bg-purple-600 rounded-lg font-medium hover:bg-purple-700 transition-colors"
-              >
-                16:9
-              </a>
-            )}
+            <a
+              href={videoUrl}
+              download
+              className="px-4 py-2 bg-purple-600 rounded-lg font-medium hover:bg-purple-700 transition-colors"
+            >
+              Download
+            </a>
           </div>
         )}
       </div>
 
       {/* Info */}
       <div className="p-4">
-        <h3 className="font-semibold mb-1 line-clamp-2">{video.concept}</h3>
+        <h3 className="font-semibold mb-1 line-clamp-2">{metadata.concept || video.concept}</h3>
         <div className="flex items-center justify-between text-sm text-gray-400">
-          <span className="capitalize">{video.format}</span>
-          <span>{new Date(video.created_at).toLocaleDateString()}</span>
+          <span>{metadata.duration ? `${Math.round(metadata.duration)}s` : ''}</span>
+          <span>{new Date(video.date).toLocaleDateString()}</span>
         </div>
       </div>
     </div>
